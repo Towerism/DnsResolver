@@ -5,6 +5,10 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DnsResolver", "DnsResolver\DnsResolver.vcxproj", "{944D4635-1537-4D50-AB38-4FB6E3540DB1}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DnsResolver.Lib", "DnsResolver.Lib\DnsResolver.Lib.vcxproj", "{9944FDD8-A2F4-4D00-84AE-03DA10407D44}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DnsResolver.Test", "DnsResolver.Test\DnsResolver.Test.vcxproj", "{FA6DAEB2-0069-45CF-A784-D35419985E91}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +25,22 @@ Global
 		{944D4635-1537-4D50-AB38-4FB6E3540DB1}.Release|x64.Build.0 = Release|x64
 		{944D4635-1537-4D50-AB38-4FB6E3540DB1}.Release|x86.ActiveCfg = Release|Win32
 		{944D4635-1537-4D50-AB38-4FB6E3540DB1}.Release|x86.Build.0 = Release|Win32
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Debug|x64.ActiveCfg = Debug|x64
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Debug|x64.Build.0 = Debug|x64
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Debug|x86.ActiveCfg = Debug|Win32
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Debug|x86.Build.0 = Debug|Win32
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Release|x64.ActiveCfg = Release|x64
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Release|x64.Build.0 = Release|x64
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Release|x86.ActiveCfg = Release|Win32
+		{9944FDD8-A2F4-4D00-84AE-03DA10407D44}.Release|x86.Build.0 = Release|Win32
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Debug|x64.ActiveCfg = Debug|x64
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Debug|x64.Build.0 = Debug|x64
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Debug|x86.ActiveCfg = Debug|Win32
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Debug|x86.Build.0 = Debug|Win32
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Release|x64.ActiveCfg = Release|x64
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Release|x64.Build.0 = Release|x64
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Release|x86.ActiveCfg = Release|Win32
+		{FA6DAEB2-0069-45CF-A784-D35419985E91}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
