@@ -4,18 +4,35 @@
 #pragma once
 
 #include <Windows.h>
+#include <memory>
 
 namespace dns {
 
-#define RECURSIVE_FLAG 1 << 8
+#define FLAG_RECURSIVE 1 << 8
+#define FLAG_QUERY (0 << 15)
+#define FLAG_STDQUERY (0 << 11)
+
 #define TYPE_A 1
 #define TYPE_PTR 12
+
 #define CLASS_INET 1
+
 #define MAX_PACKET_SIZE 512
 #define MAX_ATTEMPTS 3
 
 #pragma pack(push,1)
   struct FixedDNSheader {
+    FixedDNSheader() = default;
+    FixedDNSheader(char* buffer)
+    {
+      auto header = reinterpret_cast<FixedDNSheader*>(buffer);
+      ID = ntohs(header->ID);
+      flags = ntohs(header->flags);
+      nQuestions = ntohs(header->nQuestions);
+      nAnswers = ntohs(header->nAnswers);
+      nAuthority = ntohs(header->nAuthority);
+      nAdditional = ntohs(header->nAdditional);
+    }
     USHORT ID = htons(0);
     USHORT flags = htons(0);
     USHORT nQuestions = htons(0);
@@ -37,4 +54,5 @@ namespace dns {
 
   void LookUp(char* host, char* dnsIp);
   void MakeDNSquestion(char* packet, char* host);
+  char* MakeHostReverseIpLookup(char* host);
 }

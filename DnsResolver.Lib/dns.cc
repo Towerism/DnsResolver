@@ -5,7 +5,8 @@
 #include "dns.h"
 #include <cstdlib>
 #include <cstdio>
-#include <cmath>
+#include <ctime>
+#include <sstream>
 
 void dns::LookUp(char* host, char* dnsIp)
 {
@@ -19,27 +20,39 @@ void dns::LookUp(char* host, char* dnsIp)
     WSACleanup();
     std::exit(EXIT_FAILURE);
   }
-  // plus 2 takes into account the empty 0 after host and the first number before host
-  int size = sizeof(FixedDNSheader) + strlen(host) + 2 + sizeof(QueryHeader);
-  char *pkt = new char[size];
-  // if hostIp is not INADDR_NONE then we do type-A (1) lookup, otherwise we do PTR (2) lookup
+  size_t size = sizeof(FixedDNSheader) + 2 + sizeof(QueryHeader);
   DWORD hostIp = inet_addr(host);
   if (hostIp == INADDR_NONE) // A
   {
-    USHORT ID = rand();
+    size += strlen(host);
+  } else // PTR
+  {
+    size += strlen(host) + strlen(".in-addr.arpa");
+  }
+  // plus 2 takes into account the empty 0 after host and the first number before host
+  char *pkt = new char[size];
+  memset(pkt, 0, size);
+  srand(time(0));
+  USHORT ID = rand();
+  FixedDNSheader* dnsHeader = reinterpret_cast<FixedDNSheader*>(pkt);
+  QueryHeader* queryHeader = reinterpret_cast<QueryHeader*>(pkt + size - sizeof(QueryHeader));
+  dnsHeader->ID = htons(ID);
+  dnsHeader->nQuestions = htons(1);
+  dnsHeader->flags = htons(FLAG_RECURSIVE | FLAG_QUERY | FLAG_STDQUERY);
+  queryHeader->_class = htons(CLASS_INET);
+  // if hostIp is not INADDR_NONE then we do type-A (1) lookup, otherwise we do PTR (2) lookup
+  if (hostIp == INADDR_NONE) // A
+  {
     printf("Query   : %s, type 1, TXID 0x%.4X\n", host, ID);
-
-    FixedDNSheader* dnsHeader = reinterpret_cast<FixedDNSheader*>(pkt);
-    dnsHeader->ID = ID;
-    dnsHeader->nQuestions = htons(1);
-    dnsHeader->flags = RECURSIVE_FLAG;
-    QueryHeader* queryHeader = reinterpret_cast<QueryHeader*>(pkt + size - sizeof(QueryHeader));
-    queryHeader->_type = TYPE_A;
-    queryHeader->_class = CLASS_INET;
+    queryHeader->_type = htons(TYPE_A);
     MakeDNSquestion(reinterpret_cast<char*>(dnsHeader + 1), host);
   } else // PTR
   {
-    
+    queryHeader->_type = htons(TYPE_PTR);
+    char* reverseLookupHost = MakeHostReverseIpLookup(host);
+    printf("Query   : %s, type 12, TXID 0x%.4X\n", reverseLookupHost, ID);
+    MakeDNSquestion(reinterpret_cast<char*>(dnsHeader + 1), reverseLookupHost);
+    delete[] reverseLookupHost;
   }
 
   printf("Server  : %s\n", dnsIp);
@@ -88,7 +101,7 @@ void dns::LookUp(char* host, char* dnsIp)
     struct timeval timeout;
     timeout.tv_sec = 10;
     timeout.tv_usec = 0;
-    if (select(sock, &readers, nullptr, nullptr, &timeout) > 0)
+    if (select(sock, &readers, nullptr, nullptr, &timeout) > 0u)
     {
       struct sockaddr_in senderAddr;
       int senderAddrSize = sizeof(senderAddr);
@@ -99,7 +112,16 @@ void dns::LookUp(char* host, char* dnsIp)
         WSACleanup();
         std::exit(EXIT_FAILURE);
       }
+      if (memcmp(&senderAddr.sin_addr, &remote.sin_addr, sizeof(DWORD)) || senderAddr.sin_port != senderAddr.sin_port)
+      {
+        printf("mismatch on server ip or port\n");
+        WSACleanup();
+        std::exit(EXIT_FAILURE);
+      }
       printf("response in %d ms with %d bytes\n", (timeGetTime() - t), replySize);
+      FixedDNSheader replyHeader(buffer);
+      printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
+        replyHeader.ID, replyHeader.flags, replyHeader.nQuestions, replyHeader.nAnswers, replyHeader.nAuthority, replyHeader.nAdditional);
       break;
     }
     printf("timeout in %d ms\n", timeGetTime() - t);
@@ -112,13 +134,25 @@ void dns::LookUp(char* host, char* dnsIp)
   WSACleanup();
 }
 
+char* dns::MakeHostReverseIpLookup(char* host)
+{
+  size_t reverseIpLookupLength = strlen(host) + strlen(".in-addr.arpa") + 1;
+  char* reverseIpLookup = new char[reverseIpLookupLength];
+  memset(reverseIpLookup, 0, reverseIpLookupLength);
+  USHORT w, x, y, z;
+  sscanf(host, "%hu.%hu.%hu.%hu", &w, &x, &y, &z);
+  snprintf(reverseIpLookup, reverseIpLookupLength, "%hu.%hu.%hu.%hu.in-addr.arpa", z, y, x, w);
+  return reverseIpLookup;
+}
+
 void dns::MakeDNSquestion(char* packet, char* host)
 {
   // reject a host without at least one period
   if (strchr(host, '.') == nullptr)
     return;
   strcpy(packet + 1, host);
-  packet[strlen(host) + 1] = 0;
+  size_t len = strlen(host);
+  packet[len + 1] = 0;
   char* position = packet;
   char* period = nullptr;
   while (true) {

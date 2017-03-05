@@ -30,6 +30,12 @@
     <ClCompile Include="test_make_dns_question.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="test_make_host_reverse_ip_lookup.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="test_make_reverse_lookup_question.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

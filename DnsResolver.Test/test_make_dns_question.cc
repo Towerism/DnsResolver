@@ -6,12 +6,10 @@
 
 #include "dns.h"
 
-#include <string>
-
 class MakeDnsQuestionTests : public ::testing::Test {
 public:
   MakeDnsQuestionTests() {
-    memset(question, 0xFFFF, 100);
+    memset(question, 0xFF, 100);
 
     dns::MakeDNSquestion(question, host);
   }
@@ -32,5 +30,5 @@ TEST_F(MakeDnsQuestionTests, ReplacesFirstPeriodOccurence) {
 }
 
 TEST_F(MakeDnsQuestionTests, ReplacesAllPeriodOccurences) {
-  EXPECT_EQ("www\x02""cs\x08""whatever\x05""blaah\x06""blaaah\x04""tamu\x03""edu", std::string(question + 1));
+  EXPECT_EQ("\x03""www\x02""cs\x08""whatever\x05""blaah\x06""blaaah\x04""tamu\x03""edu", std::string(question));
 }
