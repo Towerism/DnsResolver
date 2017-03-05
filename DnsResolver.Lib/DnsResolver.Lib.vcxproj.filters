@@ -21,9 +21,21 @@
     <ClInclude Include="ResponseParser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="dns.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ResponseParser.cpp">
+    <ClCompile Include="ResponseParser.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ArgumentParser.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ArgumentParser.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="dns.cc">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

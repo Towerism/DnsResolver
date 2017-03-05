@@ -19,11 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="dns.h" />
     <ClInclude Include="ResponseParser.h" />
     <ClInclude Include="libraries.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ResponseParser.cpp" />
+    <ClCompile Include="ArgumentParser.h" />
+    <ClCompile Include="ArgumentParser.cc" />
+    <ClCompile Include="dns.cc" />
+    <ClCompile Include="ResponseParser.cc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9944FDD8-A2F4-4D00-84AE-03DA10407D44}</ProjectGuid>

@@ -18,3 +18,4 @@
 #pragma comment(lib, "uuid.lib")
 #pragma comment(lib, "odbc32.lib")
 #pragma comment(lib, "odbccp32.lib")
+#pragma comment(lib, "Ws2_32.lib")
