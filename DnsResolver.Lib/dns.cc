@@ -20,6 +20,7 @@ void dns::LookUp(char* host, char* dnsIp)
     WSACleanup();
     std::exit(EXIT_FAILURE);
   }
+  // plus 2 takes into account the empty 0 after host and the first number before host
   size_t size = sizeof(FixedDNSheader) + 2 + sizeof(QueryHeader);
   DWORD hostIp = inet_addr(host);
   if (hostIp == INADDR_NONE) // A
@@ -29,13 +30,12 @@ void dns::LookUp(char* host, char* dnsIp)
   {
     size += strlen(host) + strlen(".in-addr.arpa");
   }
-  // plus 2 takes into account the empty 0 after host and the first number before host
   char *pkt = new char[size];
   memset(pkt, 0, size);
   srand(time(0));
   USHORT ID = rand();
-  FixedDNSheader* dnsHeader = reinterpret_cast<FixedDNSheader*>(pkt);
-  QueryHeader* queryHeader = reinterpret_cast<QueryHeader*>(pkt + size - sizeof(QueryHeader));
+  FixedDNSheader* dnsHeader = (FixedDNSheader*)(pkt);
+  QueryHeader* queryHeader = (QueryHeader*)(pkt + size - sizeof(QueryHeader));
   dnsHeader->ID = htons(ID);
   dnsHeader->nQuestions = htons(1);
   dnsHeader->flags = htons(FLAG_RECURSIVE | FLAG_QUERY | FLAG_STDQUERY);
@@ -45,13 +45,13 @@ void dns::LookUp(char* host, char* dnsIp)
   {
     printf("Query   : %s, type 1, TXID 0x%.4X\n", host, ID);
     queryHeader->_type = htons(TYPE_A);
-    MakeDNSquestion(reinterpret_cast<char*>(dnsHeader + 1), host);
+    MakeDNSquestion((char*)(dnsHeader + 1), host);
   } else // PTR
   {
     queryHeader->_type = htons(TYPE_PTR);
     char* reverseLookupHost = MakeHostReverseIpLookup(host);
     printf("Query   : %s, type 12, TXID 0x%.4X\n", reverseLookupHost, ID);
-    MakeDNSquestion(reinterpret_cast<char*>(dnsHeader + 1), reverseLookupHost);
+    MakeDNSquestion((char*)(dnsHeader + 1), reverseLookupHost);
     delete[] reverseLookupHost;
   }
 
@@ -68,7 +68,7 @@ void dns::LookUp(char* host, char* dnsIp)
   local.sin_family = AF_INET;
   local.sin_port = htons(0);
   local.sin_addr.s_addr = htonl(INADDR_ANY);
-  if (bind(sock, reinterpret_cast<struct sockaddr*>(&local), sizeof(local)) == SOCKET_ERROR) {
+  if (bind(sock, (struct sockaddr*)(&local), sizeof(local)) == SOCKET_ERROR) {
     printf("bind() failed with error %d\n", WSAGetLastError());
     WSACleanup();
     std::exit(EXIT_FAILURE);
@@ -89,7 +89,7 @@ void dns::LookUp(char* host, char* dnsIp)
       break;
     printf("Attempt %d with %d bytes... ", attempts, size);
     DWORD t = timeGetTime();
-    if (sendto(sock, pkt, size, 0, reinterpret_cast<struct sockaddr*>(&remote), sizeof(remote)) == SOCKET_ERROR)
+    if (sendto(sock, pkt, size, 0, (struct sockaddr*)(&remote), sizeof(remote)) == SOCKET_ERROR)
     {
       printf("sendto() failed with error %d\n", WSAGetLastError());
       WSACleanup();
@@ -105,7 +105,7 @@ void dns::LookUp(char* host, char* dnsIp)
     {
       struct sockaddr_in senderAddr;
       int senderAddrSize = sizeof(senderAddr);
-      replySize = recvfrom(sock, buffer, MAX_PACKET_SIZE, 0, reinterpret_cast<struct sockaddr*>(&senderAddr), &senderAddrSize);
+      replySize = recvfrom(sock, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)(&senderAddr), &senderAddrSize);
       if (replySize == SOCKET_ERROR)
       {
         printf("recvfrom() failed with error %d\n", WSAGetLastError());
