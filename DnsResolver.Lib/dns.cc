@@ -279,10 +279,11 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     {
       printf("        ");
     }
-    size_t nRecursiveJumps = 0;
     std::ostringstream oss;
     do 
     {
+      if (returnCursors.size() > replySize)
+        PrintInvalidMessage("record", "jump loop");
       if (CursorOverflowed(buffer, replySize, cursor + 1))
         PrintInvalidMessage("record", "truncated jump offset");
       USHORT jumpIdentifier = ntohs(*(USHORT*)cursor);
@@ -305,9 +306,6 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
           labelLength = *cursor;
           // jump mid answer
           if (labelLength == IDENTIFIER_JUMP_START) {
-            ++nRecursiveJumps;
-            if (nRecursiveJumps > replySize)
-              PrintInvalidMessage("record", "jump loop");
             break;
           }
           if (type != TYPE_A) {
