@@ -80,7 +80,7 @@ void dns::LookUp(char* host, char* dnsIp)
   remote.sin_port = htons(53); //DNS port on server
 
   int attempts = 0;
-  int replySize = 0;
+  size_t replySize = 0;
   char buffer[MAX_PACKET_SIZE + 1];
   memset(buffer, 0, MAX_PACKET_SIZE + 1);
   while (true)
@@ -118,20 +118,117 @@ void dns::LookUp(char* host, char* dnsIp)
         WSACleanup();
         std::exit(EXIT_FAILURE);
       }
+      WSACleanup();
+      auto replyHeader = new FixedDNSheader(buffer);
+      if (replyHeader->ID != ID)
+      {
+        printf("mismatch on TXID\n");
+        std::exit(EXIT_FAILURE);
+      }
       printf("response in %d ms with %d bytes\n", (timeGetTime() - t), replySize);
-      FixedDNSheader replyHeader(buffer);
       printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
-        replyHeader.ID, replyHeader.flags, replyHeader.nQuestions, replyHeader.nAnswers, replyHeader.nAuthority, replyHeader.nAdditional);
-      break;
+        replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
+      USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
+      if (returnCode == 0)
+        printf("  succeeded with Rcode = 0\n");
+      else
+        printf("  failed with Rcode = %hu\n", returnCode);
+      char* question = (char*)(buffer + sizeof(FixedDNSheader));
+      size_t position = 0;
+      if (replyHeader->nQuestions > 0)
+        printf("   ------------ [questions] ----------\n");
+      for (int i = 0; i < replyHeader->nQuestions; ++i)
+      {
+        printf("        ");
+        int labelLength;
+        do
+        {
+          labelLength = question[position];
+          printf("%.*s", labelLength, question + position + 1);
+          position += labelLength + 1;
+          if (question[position] != 0)
+            printf(".");
+        } while (labelLength != 0);
+        QueryHeader* query = new QueryHeader(question + position);
+        printf(" type %hu class %hu\n", query->_type, query->_class);
+
+        position += sizeof(QueryHeader);
+      }
+      UCHAR* cursor = (UCHAR*)(question + position);
+      UCHAR* returnCursor = nullptr;
+      int ttl = TTL_NULL;
+      UINT answers = replyHeader->nAnswers;
+      if (answers == 0)
+        return;
+      printf("   ------------ [answers] ----------\n");
+      for (int i = 0; i < answers * 2; ++i)
+      {
+        // if i is even we are printing the question
+        // if i is odd we are printing the answer
+        if (i % 2 == 0)
+        {
+          printf("        ");
+        }
+        USHORT jumpIdentifier = 0;
+        USHORT offset = 0; // offset from buffer
+        bool jumpMidAnswer = false;
+        do 
+        {
+          jumpIdentifier = ntohs(*(USHORT*)cursor);
+          offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
+          if (jumpIdentifier >= MASK_JUMP_START) 
+          {
+            returnCursor = cursor + 2;
+            cursor = (UCHAR*)(buffer + offset);
+          } else
+          {
+            USHORT labelLength = 0;
+            do 
+            {
+              labelLength = *cursor;
+              if (labelLength == IDENTIFIER_JUMP_START) {
+                jumpMidAnswer = true;
+                break;
+              }
+              printf("%.*s", labelLength, (char*)(cursor + 1));
+              if (*cursor != 0)
+                cursor += labelLength + 1;
+              if (*cursor != 0)
+                printf(".");
+            } while (labelLength != 0);
+            if (jumpMidAnswer)
+            {
+              jumpMidAnswer = false;
+              continue;
+            }
+            if (returnCursor != nullptr) 
+            {
+              cursor = returnCursor;
+              returnCursor = nullptr;
+            }
+          }
+        } while (*cursor != 0);
+        if (i % 2 == 0) 
+        {
+          DNSanswerHeader* answer = new DNSanswerHeader(cursor);
+          if (answer->_type == TYPE_PTR)
+          {
+            printf(" PTR ");
+          }
+          ttl = answer->_ttl;
+          cursor += sizeof(DNSanswerHeader);
+        } else
+        {
+          printf(" TTL = %d \n", ttl);
+          cursor += 1;
+        }
+      }
+
+      return;
     }
     printf("timeout in %d ms\n", timeGetTime() - t);
     attempts += 1;
   }
-  for (int i = 0; i < replySize; i++) {
-    printf("packet[%d]: 0x%x\n", i, buffer[i]);
-  }
-
-  WSACleanup();
 }
 
 char* dns::MakeHostReverseIpLookup(char* host)

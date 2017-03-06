@@ -18,17 +18,11 @@
     <ClInclude Include="libraries.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ResponseParser.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="dns.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ResponseParser.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ArgumentParser.h">
       <Filter>Source Files</Filter>
     </ClCompile>

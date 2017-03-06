@@ -11,21 +11,28 @@ namespace dns {
 #define FLAG_RECURSIVE 1 << 8
 #define FLAG_QUERY (0 << 15)
 #define FLAG_STDQUERY (0 << 11)
+#define MASK_FLAG_RETURNCODE 0x000F
+
+#define IDENTIFIER_JUMP_START 0xC0
+#define MASK_JUMP_START (IDENTIFIER_JUMP_START << 8)
+#define MASK_JUMP_OFFSET 0x3FFF
 
 #define TYPE_A 1
+#define TYPE_NS 2
+#define TYPE_CNAME 5
 #define TYPE_PTR 12
 
 #define CLASS_INET 1
 
 #define MAX_PACKET_SIZE 512
 #define MAX_ATTEMPTS 3
+#define TTL_NULL -1
 
 #pragma pack(push,1)
   struct FixedDNSheader {
-    FixedDNSheader() = default;
     FixedDNSheader(char* buffer)
     {
-      auto header = reinterpret_cast<FixedDNSheader*>(buffer);
+      auto header = (FixedDNSheader*)(buffer);
       ID = ntohs(header->ID);
       flags = ntohs(header->flags);
       nQuestions = ntohs(header->nQuestions);
@@ -33,22 +40,36 @@ namespace dns {
       nAuthority = ntohs(header->nAuthority);
       nAdditional = ntohs(header->nAdditional);
     }
-    USHORT ID = htons(0);
-    USHORT flags = htons(0);
-    USHORT nQuestions = htons(0);
-    USHORT nAnswers = htons(0);
-    USHORT nAuthority = htons(0);
-    USHORT nAdditional = htons(0);
+    USHORT ID = 0;
+    USHORT flags = 0;
+    USHORT nQuestions = 0;
+    USHORT nAnswers = 0;
+    USHORT nAuthority = 0;
+    USHORT nAdditional = 0;
   };
   struct QueryHeader {
-    USHORT _type = htons(0);
-    USHORT _class = htons(0);
+    QueryHeader(char* buffer)
+    {
+      auto header = (QueryHeader*)(buffer);
+      _type = ntohs(header->_type);
+      _class = ntohs(header->_class);
+    }
+    USHORT _type = 0;
+    USHORT _class = 0;
   };
   struct DNSanswerHeader {
-    USHORT _type = htons(0);
-    USHORT _class = htons(0);
-    UINT _ttl = htons(0);
-    USHORT _len = htons(0);
+    DNSanswerHeader(UCHAR* buffer)
+    {
+      auto header = (DNSanswerHeader*)buffer;
+      _type = ntohs(header->_type);
+      _class = ntohs(header->_class);
+      _ttl = ntohl(header->_ttl);
+      _len = ntohs(header->_len);
+    }
+    USHORT _type = 0;
+    USHORT _class = 0;
+    UINT _ttl = 0;
+    USHORT _len = 0;
   };
 #pragma pack(pop)
 
