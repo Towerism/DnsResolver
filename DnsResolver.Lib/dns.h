@@ -5,6 +5,7 @@
 
 #include <Windows.h>
 #include <memory>
+#include <string>
 
 namespace dns {
 
@@ -72,6 +73,13 @@ namespace dns {
     USHORT _class = 0;
     UINT _ttl = 0;
     USHORT _len = 0;
+    bool TypeIsSupported() const
+    {
+      return _type == TYPE_A 
+        || _type == TYPE_NS
+        || _type == TYPE_CNAME
+        || _type == TYPE_PTR;
+    }
     USHORT PrintType() const
     {
       if (_type == TYPE_A)
@@ -109,5 +117,5 @@ namespace dns {
   void PrintInvalidMessage(const char* invalidType, const char* messageFormat, ...);
   void ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position);
   void ParseResourceRecords(const char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers);
-  void PrintIp(UINT binary);
+  std::string GetIp(UINT binary);
 }

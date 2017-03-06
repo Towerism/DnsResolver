@@ -267,6 +267,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
   if (answers == 0)
     return;
   printf("   ------------ [%s] ----------\n", heading);
+  DNSanswerHeader* answer = nullptr;
   for (int i = 0; i < answers << 1; ++i)
   {
     // if i is even we are printing the question,
@@ -277,6 +278,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       printf("        ");
     }
     size_t nRecursiveJumps = 0;
+    std::ostringstream oss;
     do 
     {
       if (CursorOverflowed(buffer, replySize, cursor + 1))
@@ -309,18 +311,21 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
             break;
           }
           if (type != TYPE_A) {
-            printf("%.*s", labelLength, (char*)(cursor + 1));
+            char* label = new char[labelLength + 1];
+            memset(label, 0, labelLength + 1);
+            sprintf(label, "%.*s", labelLength, (char*)(cursor + 1));
+            oss << std::string(label);
           } else
           {
             type = TYPE_LIMBO;
-            PrintIp(ntohl(*(UINT*)(cursor)));
+            oss << GetIp(ntohl(*(UINT*)(cursor)));
             cursor += sizeof(UINT);
             break;
           }
           if ((char*)cursor < buffer + replySize && *cursor != 0)
             cursor += labelLength + 1;
           if ((char*)cursor < buffer + replySize && *cursor != 0)
-            printf(".");
+            oss << '.';
         } while (labelLength != 0);
       }
     } while ((char*)cursor < buffer + replySize && *cursor != 0 && type != TYPE_LIMBO);
@@ -331,10 +336,23 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       returnCursors.clear();
     }
     if (printingQuestion) 
+      answer = new DNSanswerHeader(cursor);
+    if (answer != nullptr)
+    {
+      if (answer->TypeIsSupported())
+      {
+        printf("%s", std::string(oss.str()).c_str());
+        oss.clear();
+      } else {
+        ++parsedAnswers;
+        ++i;
+        continue;
+      }
+    }
+    if (printingQuestion) 
     {
       if (CursorOverflowed(buffer, replySize, cursor))
         PrintInvalidMessage("record", "truncated fixed RR header");
-      DNSanswerHeader* answer = new DNSanswerHeader(cursor);
       type = answer->PrintType();
       ttl = answer->_ttl;
       cursor += sizeof(DNSanswerHeader);
@@ -344,6 +362,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     {
       ++parsedAnswers;
       type = TYPE_NULL;
+      answer = nullptr;
       printf(" TTL = %d \n", ttl);
       // don't advance cursor if we have to jump again
       if (*cursor != IDENTIFIER_JUMP_START)
@@ -356,10 +375,12 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     PrintInvalidMessage("record", "not enough records");
 }
 
-void dns::PrintIp(UINT binary)
+std::string dns::GetIp(UINT binary)
 {
-  printf("%u.", (binary >> 0x18) & 0xFF);
-  printf("%u.", (binary >> 0x10) & 0xFF);
-  printf("%u.", (binary >> 0x08) & 0xFF);
-  printf("%u", binary & 0xFF);
+  std::ostringstream oss;
+  oss << ((binary >> 0x18) & 0xFF) << ".";
+  oss << ((binary >> 0x10) & 0xFF) << ".";
+  oss << ((binary >> 0x08) & 0xFF) << ".";
+  oss << (binary & 0xFF);
+  return std::string(oss.str());
 }
