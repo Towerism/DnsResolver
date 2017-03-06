@@ -175,6 +175,15 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t re
     printf("  failed with Rcode = %hu\n", returnCode);
   char* question = (char*)(buffer + sizeof(FixedDNSheader));
   size_t position = 0;
+  ParseQuestions(replyHeader, question, position);
+  UCHAR* cursor = (UCHAR*)(question + position);
+  ParseResourceRecords("answers", buffer, replySize, cursor, replyHeader->nAnswers);
+  ParseResourceRecords("authority", buffer, replySize, cursor, replyHeader->nAuthority);
+  ParseResourceRecords("additional", buffer, replySize, cursor, replyHeader->nAdditional);
+}
+
+void dns::ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position)
+{
   if (replyHeader->nQuestions > 0)
     printf("   ------------ [questions] ----------\n");
   for (int i = 0; i < replyHeader->nQuestions; ++i)
@@ -189,26 +198,26 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t re
       if (question[position] != 0)
         printf(".");
     } while (labelLength != 0);
-    QueryHeader* query = new QueryHeader(question + position);
+    dns::QueryHeader* query = new dns::QueryHeader(question + position);
     printf(" type %hu class %hu\n", query->_type, query->_class);
-
-    position += sizeof(QueryHeader);
+    position += sizeof(dns::QueryHeader);
   }
-  UCHAR* cursor = (UCHAR*)(question + position);
-  UCHAR* returnCursor = nullptr;
-  int ttl = TTL_NULL;
+}
+
+void dns::ParseResourceRecords(char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers)
+{
   USHORT type = TYPE_NULL;
-  UINT answers = replyHeader->nAnswers;
+  UINT ttl = TTL_NULL;
   std::deque<UCHAR*> returnCursors;
   if (answers == 0)
     return;
-  printf("   ------------ [answers] ----------\n");
+  printf("   ------------ [%s] ----------\n", heading);
   for (int i = 0; i < answers << 1; ++i)
   {
-    // if i is even we are printing the answer,
-    // otherwise we are printing the question
-    bool printingAnswer = i % 2 == 0;
-    if (printingAnswer)
+    // if i is even we are printing the question,
+    // otherwise we are printing the answer
+    bool printingQuestion = i % 2 == 0;
+    if (printingQuestion)
     {
       printf("        ");
     }
@@ -235,7 +244,7 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t re
           } else
           {
             type = TYPE_LIMBO;
-            PrintIp(ntohl(*(UINT*)(cursor)));
+            dns::PrintIp(ntohl(*(UINT*)(cursor)));
             cursor += sizeof(UINT);
             break;
           }
@@ -252,12 +261,12 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t re
       cursor = returnCursors.front();
       returnCursors.clear();
     }
-    if (printingAnswer) 
+    if (printingQuestion) 
     {
-      DNSanswerHeader* answer = new DNSanswerHeader(cursor);
+      dns::DNSanswerHeader* answer = new dns::DNSanswerHeader(cursor);
       type = answer->PrintType();
       ttl = answer->_ttl;
-      cursor += sizeof(DNSanswerHeader);
+      cursor += sizeof(dns::DNSanswerHeader);
     } else
     {
       type = TYPE_NULL;
@@ -269,6 +278,7 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t re
       }
     }
   }
+  return;
 }
 
 void dns::PrintIp(UINT binary)

@@ -99,5 +99,7 @@ namespace dns {
   void MakeDNSquestion(char* packet, char* host);
   char* MakeHostReverseIpLookup(char* host);
   void ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t replySize);
+  void ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position);
+  void ParseResourceRecords(char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers);
   void PrintIp(UINT binary);
 }
