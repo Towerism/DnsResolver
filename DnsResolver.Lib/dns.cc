@@ -303,8 +303,6 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
           if (CursorOverflowed(buffer, replySize, cursor + 0))
             PrintInvalidMessage("record", "truncated name");
           labelLength = *cursor;
-          if (CursorOverflowed(buffer, replySize, cursor + 1))
-            PrintInvalidMessage("record", "truncated name");
           // jump mid answer
           if (labelLength == IDENTIFIER_JUMP_START) {
             ++nRecursiveJumps;
@@ -313,6 +311,8 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
             break;
           }
           if (type != TYPE_A) {
+            if (labelLength > 0 && CursorOverflowed(buffer, replySize, cursor + 1))
+              PrintInvalidMessage("record", "truncated name");
             char* label = new char[labelLength + 1];
             memset(label, 0, labelLength + 1);
             sprintf(label, "%.*s", labelLength, (char*)(cursor + 1));
@@ -340,6 +340,8 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     if (printingQuestion) {
       if (CursorOverflowed(buffer, replySize, cursor))
         PrintInvalidMessage("record", "truncated fixed RR header");
+      if (*(USHORT*)cursor == 0)
+        ++cursor;
       answer = new DNSanswerHeader(cursor);
     }
     if (answer != nullptr)
