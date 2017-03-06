@@ -23,7 +23,7 @@ void dns::LookUp(char* host, char* dnsIp)
   }
   size_t size;
   char* pkt;
-  MakePacket(host, size, pkt);
+  USHORT txid = MakePacket(host, size, pkt);
 
   printf("Server  : %s\n", dnsIp);
   printf("********************************\n");
@@ -31,10 +31,10 @@ void dns::LookUp(char* host, char* dnsIp)
   sockaddr_in remote;
   if (SetupSocket(dnsIp, sock, remote)) return;
 
-  SendPacketUnreliablyAndParseReply(size, pkt, sock, remote);
+  SendPacketUnreliablyAndParseReply(size, pkt, sock, remote, txid);
 }
 
-void dns::MakePacket(char* host, size_t& size, char*& pkt)
+USHORT dns::MakePacket(char* host, size_t& size, char*& pkt)
 {
   size = sizeof(FixedDNSheader) + 2 + sizeof(QueryHeader);
   DWORD hostIp = inet_addr(host);
@@ -69,99 +69,7 @@ void dns::MakePacket(char* host, size_t& size, char*& pkt)
     MakeDNSquestion((char*)(dnsHeader + 1), reverseLookupHost);
     delete[] reverseLookupHost;
   }
-}
-
-bool dns::SetupSocket(char* dnsIp, SOCKET& sock, sockaddr_in& remote)
-{
-  sock = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sock == INVALID_SOCKET) {
-    printf("socket() generated error %d\n", WSAGetLastError());
-    WSACleanup();
-    std::exit(EXIT_FAILURE);
-  }
-  struct sockaddr_in local;
-  memset(&local, 0, sizeof(local));
-  local.sin_family = AF_INET;
-  local.sin_port = htons(0);
-  local.sin_addr.s_addr = htonl(INADDR_ANY);
-  if (bind(sock, (struct sockaddr*)(&local), sizeof(local)) == SOCKET_ERROR) {
-    printf("bind() failed with error %d\n", WSAGetLastError());
-    WSACleanup();
-    std::exit(EXIT_FAILURE);
-  }
-  memset(&remote, 0, sizeof(remote));
-  remote.sin_family = AF_INET;
-  remote.sin_addr.s_addr = inet_addr(dnsIp); //server's IP
-  remote.sin_port = htons(53); //DNS port on server
-  return false;
-}
-
-void dns::SendPacketUnreliablyAndParseReply(size_t size, char* pkt, SOCKET sock, sockaddr_in remote)
-{
-  int attempts = 0;
-  size_t replySize = 0;
-  char buffer[MAX_PACKET_SIZE + 1];
-  memset(buffer, 0, MAX_PACKET_SIZE + 1);
-  while (true)
-  {
-    if (attempts == MAX_ATTEMPTS)
-      break;
-    printf("Attempt %d with %d bytes... ", attempts, size);
-    DWORD t = timeGetTime();
-    SendPacket(size, pkt, sock, remote);
-    if (AttemptToReceiveAndParseReply(sock, remote, replySize, buffer, t)) return;
-    printf("timeout in %d ms\n", timeGetTime() - t);
-    attempts += 1;
-  }
-}
-
-void dns::SendPacket(size_t size, char* pkt, SOCKET sock, sockaddr_in remote)
-{
-  if (sendto(sock, pkt, size, 0, (struct sockaddr*)(&remote), sizeof(remote)) == SOCKET_ERROR)
-  {
-    printf("sendto() failed with error %d\n", WSAGetLastError());
-    WSACleanup();
-    std::exit(EXIT_FAILURE);
-  }
-}
-
-bool dns::AttemptToReceiveAndParseReply(SOCKET sock, sockaddr_in remote, size_t replySize, char buffer[513], DWORD t)
-{
-  fd_set readers;
-  FD_ZERO(&readers);
-  FD_SET(sock, &readers);
-  struct timeval timeout;
-  timeout.tv_sec = 10;
-  timeout.tv_usec = 0;
-  if (select(sock, &readers, nullptr, nullptr, &timeout) > 0u)
-  {
-    struct sockaddr_in senderAddr;
-    int senderAddrSize = sizeof(senderAddr);
-    replySize = recvfrom(sock, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)(&senderAddr), &senderAddrSize);
-    PrintAnyReceptionErrors(remote, replySize, senderAddr);
-    printf("response in %d ms with %zu bytes\n", (timeGetTime() - t), replySize);
-    dns::ParseDnsReply(buffer, replySize);
-
-    return true;
-  }
-  return false;
-}
-
-void dns::PrintAnyReceptionErrors(sockaddr_in remote, size_t replySize, sockaddr_in senderAddr)
-{
-  if (replySize == SOCKET_ERROR)
-  {
-    printf("recvfrom() failed with error %d\n", WSAGetLastError());
-    WSACleanup();
-    std::exit(EXIT_FAILURE);
-  }
-  if (memcmp(&senderAddr.sin_addr, &remote.sin_addr, sizeof(DWORD)) || senderAddr.sin_port != senderAddr.sin_port)
-  {
-    printf("mismatch on server ip or port\n");
-    WSACleanup();
-    std::exit(EXIT_FAILURE);
-  }
-  WSACleanup();
+  return ID;
 }
 
 char* dns::MakeHostReverseIpLookup(char* host)
@@ -196,11 +104,108 @@ void dns::MakeDNSquestion(char* packet, char* host)
   }
 }
 
-void dns::ParseDnsReply(char buffer[513], size_t replySize)
+bool dns::SetupSocket(char* dnsIp, SOCKET& sock, sockaddr_in& remote)
+{
+  sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock == INVALID_SOCKET) {
+    printf("socket() generated error %d\n", WSAGetLastError());
+    WSACleanup();
+    std::exit(EXIT_FAILURE);
+  }
+  struct sockaddr_in local;
+  memset(&local, 0, sizeof(local));
+  local.sin_family = AF_INET;
+  local.sin_port = htons(0);
+  local.sin_addr.s_addr = htonl(INADDR_ANY);
+  if (bind(sock, (struct sockaddr*)(&local), sizeof(local)) == SOCKET_ERROR) {
+    printf("bind() failed with error %d\n", WSAGetLastError());
+    WSACleanup();
+    std::exit(EXIT_FAILURE);
+  }
+  memset(&remote, 0, sizeof(remote));
+  remote.sin_family = AF_INET;
+  remote.sin_addr.s_addr = inet_addr(dnsIp); //server's IP
+  remote.sin_port = htons(53); //DNS port on server
+  return false;
+}
+
+void dns::SendPacketUnreliablyAndParseReply(size_t size, char* pkt, SOCKET sock, sockaddr_in remote, USHORT txid)
+{
+  int attempts = 0;
+  size_t replySize = 0;
+  char buffer[MAX_PACKET_SIZE + 1];
+  memset(buffer, 0, MAX_PACKET_SIZE + 1);
+  while (true)
+  {
+    if (attempts == MAX_ATTEMPTS)
+      break;
+    printf("Attempt %d with %d bytes... ", attempts, size);
+    DWORD t = timeGetTime();
+    SendPacket(size, pkt, sock, remote);
+    if (AttemptToReceiveAndParseReply(sock, remote, replySize, buffer, t, txid)) return;
+    printf("timeout in %d ms\n", timeGetTime() - t);
+    attempts += 1;
+  }
+}
+
+void dns::SendPacket(size_t size, char* pkt, SOCKET sock, sockaddr_in remote)
+{
+  if (sendto(sock, pkt, size, 0, (struct sockaddr*)(&remote), sizeof(remote)) == SOCKET_ERROR)
+  {
+    printf("sendto() failed with error %d\n", WSAGetLastError());
+    WSACleanup();
+    std::exit(EXIT_FAILURE);
+  }
+}
+
+bool dns::AttemptToReceiveAndParseReply(SOCKET sock, sockaddr_in remote, size_t replySize, char buffer[513], DWORD t, USHORT txid)
+{
+  fd_set readers;
+  FD_ZERO(&readers);
+  FD_SET(sock, &readers);
+  struct timeval timeout;
+  timeout.tv_sec = 10;
+  timeout.tv_usec = 0;
+  if (select(sock, &readers, nullptr, nullptr, &timeout) > 0u)
+  {
+    struct sockaddr_in senderAddr;
+    int senderAddrSize = sizeof(senderAddr);
+    replySize = recvfrom(sock, buffer, MAX_PACKET_SIZE, 0, (struct sockaddr*)(&senderAddr), &senderAddrSize);
+    PrintAnyReceptionErrors(remote, replySize, senderAddr);
+    printf("response in %d ms with %zu bytes\n", (timeGetTime() - t), replySize);
+    dns::ParseDnsReply(buffer, replySize, txid);
+
+    return true;
+  }
+  return false;
+}
+
+void dns::PrintAnyReceptionErrors(sockaddr_in remote, size_t replySize, sockaddr_in senderAddr)
+{
+  if (replySize == SOCKET_ERROR)
+  {
+    printf("recvfrom() failed with error %d\n", WSAGetLastError());
+    WSACleanup();
+    std::exit(EXIT_FAILURE);
+  }
+  if (memcmp(&senderAddr.sin_addr, &remote.sin_addr, sizeof(DWORD)) || senderAddr.sin_port != senderAddr.sin_port)
+  {
+    printf("mismatch on server ip or port\n");
+    WSACleanup();
+    std::exit(EXIT_FAILURE);
+  }
+  WSACleanup();
+}
+
+void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
 {
   auto replyHeader = new FixedDNSheader(buffer);
   printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
          replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
+  if (replySize < sizeof(FixedDNSheader))
+    PrintInvalidMessage("reply", "smaller than fixed header");
+  if (replyHeader->ID != txid)
+    PrintInvalidMessage("reply", "TXID mismatch, sent 0x%.4X, received 0x%.4X", txid, replyHeader->ID);
   USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
   if (returnCode == 0)
     printf("  succeeded with Rcode = 0\n");
@@ -213,6 +218,17 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize)
   ParseResourceRecords("answers", buffer, replySize, cursor, replyHeader->nAnswers);
   ParseResourceRecords("authority", buffer, replySize, cursor, replyHeader->nAuthority);
   ParseResourceRecords("additional", buffer, replySize, cursor, replyHeader->nAdditional);
+}
+
+void dns::PrintInvalidMessage(const char* invalidType, const char* messageFormat, ...)
+{
+  printf("  ++ invalid %s: ", invalidType);
+  va_list args;
+  va_start(args, messageFormat);
+  vprintf(messageFormat, args);
+  va_end(args);
+  printf("\n");
+  std::exit(EXIT_FAILURE);
 }
 
 void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& position)
@@ -237,7 +253,7 @@ void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& po
   }
 }
 
-void dns::ParseResourceRecords(char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers)
+void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers)
 {
   USHORT type = TYPE_NULL;
   UINT ttl = TTL_NULL;

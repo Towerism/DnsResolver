@@ -97,16 +97,17 @@ namespace dns {
 
   void LookUp(char* host, char* dnsIp);
 
-  void MakePacket(char* host, size_t& size, char*& pkt);
-  bool SetupSocket(char* dnsIp, SOCKET& sock, sockaddr_in& remote);
-  void SendPacketUnreliablyAndParseReply(size_t size, char* pkt, SOCKET sock, sockaddr_in remote);
-  void SendPacket(size_t size, char* pkt, SOCKET sock, sockaddr_in remote);
-  bool AttemptToReceiveAndParseReply(SOCKET sock, sockaddr_in remote, size_t replySize, char buffer[513], DWORD t);
-  void PrintAnyReceptionErrors(sockaddr_in remote, size_t replySize, sockaddr_in senderAddr);
+  USHORT MakePacket(char* host, size_t& size, char*& pkt);
   void MakeDNSquestion(char* packet, char* host);
   char* MakeHostReverseIpLookup(char* host);
-  void ParseDnsReply(char buffer[513], size_t replySize);
+  bool SetupSocket(char* dnsIp, SOCKET& sock, sockaddr_in& remote);
+  void SendPacketUnreliablyAndParseReply(size_t size, char* pkt, SOCKET sock, sockaddr_in remote, USHORT txid);
+  void SendPacket(size_t size, char* pkt, SOCKET sock, sockaddr_in remote);
+  bool AttemptToReceiveAndParseReply(SOCKET sock, sockaddr_in remote, size_t replySize, char buffer[513], DWORD t, USHORT txid);
+  void PrintAnyReceptionErrors(sockaddr_in remote, size_t replySize, sockaddr_in senderAddr);
+  void ParseDnsReply(char buffer[513], size_t replySize, USHORT txid);
+  void PrintInvalidMessage(const char* invalidType, const char* messageFormat, ...);
   void ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position);
-  void ParseResourceRecords(char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers);
+  void ParseResourceRecords(const char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers);
   void PrintIp(UINT binary);
 }
