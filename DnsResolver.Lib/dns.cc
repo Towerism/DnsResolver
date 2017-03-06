@@ -222,7 +222,7 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
 
 void dns::PrintInvalidMessage(const char* invalidType, const char* messageFormat, ...)
 {
-  printf("  ++ invalid %s: ", invalidType);
+  printf("\n  ++ invalid %s: ", invalidType);
   va_list args;
   va_start(args, messageFormat);
   vprintf(messageFormat, args);
@@ -253,8 +253,14 @@ void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& po
   }
 }
 
+bool CursorOverflowed(char* buffer, size_t replySize, UCHAR* cursor)
+{
+  return (char*)cursor >= buffer + replySize;
+}
+
 void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers)
 {
+  size_t parsedAnswers = 0;
   USHORT type = TYPE_NULL;
   UINT ttl = TTL_NULL;
   std::deque<UCHAR*> returnCursors;
@@ -270,12 +276,19 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     {
       printf("        ");
     }
+    size_t nRecursiveJumps = 0;
     do 
     {
+      if (CursorOverflowed(buffer, replySize, cursor + 1))
+        PrintInvalidMessage("record", "truncated jump offset");
       USHORT jumpIdentifier = ntohs(*(USHORT*)cursor);
       USHORT offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
       if (jumpIdentifier >= MASK_JUMP_START && type != TYPE_A) 
       {
+        if ((char*)cursor >= buffer + replySize)
+          PrintInvalidMessage("record", "jump beyond packet boundary");
+        if (offset < sizeof(FixedDNSheader))
+          PrintInvalidMessage("record", "jump into fixed header");
         returnCursors.push_back(cursor + 2);
         cursor = (UCHAR*)(buffer + offset);
       } else
@@ -283,9 +296,16 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
         USHORT labelLength = 0;
         do 
         {
+          if (CursorOverflowed(buffer, replySize, cursor + 0))
+            PrintInvalidMessage("record", "truncated name");
           labelLength = *cursor;
+          if (CursorOverflowed(buffer, replySize, cursor + 1))
+            PrintInvalidMessage("record", "truncated name");
           // jump mid answer
           if (labelLength == IDENTIFIER_JUMP_START) {
+            ++nRecursiveJumps;
+            if (nRecursiveJumps > replySize)
+              PrintInvalidMessage("record", "jump loop");
             break;
           }
           if (type != TYPE_A) {
@@ -312,12 +332,17 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     }
     if (printingQuestion) 
     {
+      if (CursorOverflowed(buffer, replySize, cursor))
+        PrintInvalidMessage("record", "truncated fixed RR header");
       DNSanswerHeader* answer = new DNSanswerHeader(cursor);
       type = answer->PrintType();
       ttl = answer->_ttl;
       cursor += sizeof(DNSanswerHeader);
+      if (CursorOverflowed(buffer, replySize, cursor + answer->_len - 1))
+        PrintInvalidMessage("record", "RR value length beyond packet");
     } else
     {
+      ++parsedAnswers;
       type = TYPE_NULL;
       printf(" TTL = %d \n", ttl);
       // don't advance cursor if we have to jump again
@@ -327,6 +352,8 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       }
     }
   }
+  if (parsedAnswers < answers)
+    PrintInvalidMessage("record", "not enough records");
 }
 
 void dns::PrintIp(UINT binary)
