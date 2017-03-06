@@ -17,6 +17,7 @@ namespace dns {
 #define MASK_JUMP_START (IDENTIFIER_JUMP_START << 8)
 #define MASK_JUMP_OFFSET 0x3FFF
 
+#define TYPE_LIMBO 0xFF // not null but also not a type
 #define TYPE_NULL 0
 #define TYPE_A 1
 #define TYPE_NS 2
@@ -87,7 +88,7 @@ namespace dns {
         printf(" PTR ");
       } else
       {
-        printf(" UNSUPPORTE TYPE\n");
+        printf(" UNSUPPORTED TYPE\n");
       }
       return _type;
     }
@@ -97,6 +98,6 @@ namespace dns {
   void LookUp(char* host, char* dnsIp);
   void MakeDNSquestion(char* packet, char* host);
   char* MakeHostReverseIpLookup(char* host);
-  void ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader);
+  void ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t replySize);
   void PrintIp(UINT binary);
 }

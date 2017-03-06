@@ -122,8 +122,8 @@ void dns::LookUp(char* host, char* dnsIp)
       }
       WSACleanup();
       auto replyHeader = new dns::FixedDNSheader(buffer);
-      printf("response in %d ms with %d bytes\n", (timeGetTime() - t), replySize);
-      ParseDnsReply(buffer, replyHeader);
+      printf("response in %d ms with %zu bytes\n", (timeGetTime() - t), replySize);
+      ParseDnsReply(buffer, replyHeader, replySize);
 
       return;
     }
@@ -164,7 +164,7 @@ void dns::MakeDNSquestion(char* packet, char* host)
   }
 }
 
-void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader)
+void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader, size_t replySize)
 {
   printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
          replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
@@ -216,7 +216,7 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader)
     {
       USHORT jumpIdentifier = ntohs(*(USHORT*)cursor);
       USHORT offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
-      if (jumpIdentifier >= MASK_JUMP_START) 
+      if (jumpIdentifier >= MASK_JUMP_START && type != TYPE_A) 
       {
         returnCursors.push_back(cursor + 2);
         cursor = (UCHAR*)(buffer + offset);
@@ -234,17 +234,18 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader)
             printf("%.*s", labelLength, (char*)(cursor + 1));
           } else
           {
+            type = TYPE_LIMBO;
             PrintIp(ntohl(*(UINT*)(cursor)));
             cursor += sizeof(UINT);
             break;
           }
-          if (*cursor != 0)
+          if ((char*)cursor < buffer + replySize && *cursor != 0)
             cursor += labelLength + 1;
-          if (*cursor != 0)
+          if ((char*)cursor < buffer + replySize && *cursor != 0)
             printf(".");
         } while (labelLength != 0);
       }
-    } while (*cursor != 0);
+    } while ((char*)cursor < buffer + replySize && *cursor != 0 && type != TYPE_LIMBO);
     if (!returnCursors.empty())
     {
       // always return to the point after the original jump
@@ -259,6 +260,7 @@ void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader)
       cursor += sizeof(DNSanswerHeader);
     } else
     {
+      type = TYPE_NULL;
       printf(" TTL = %d \n", ttl);
       // don't advance cursor if we have to jump again
       if (*cursor != IDENTIFIER_JUMP_START)
