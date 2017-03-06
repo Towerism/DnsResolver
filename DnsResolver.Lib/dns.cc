@@ -209,8 +209,10 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
   USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
   if (returnCode == 0)
     printf("  succeeded with Rcode = 0\n");
-  else
+  else {
     printf("  failed with Rcode = %hu\n", returnCode);
+    return;
+  }
   char* question = (char*)(buffer + sizeof(FixedDNSheader));
   size_t position = 0;
   ParseQuestions(replyHeader, question, position);
