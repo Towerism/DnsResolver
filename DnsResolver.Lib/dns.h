@@ -17,6 +17,7 @@ namespace dns {
 #define MASK_JUMP_START (IDENTIFIER_JUMP_START << 8)
 #define MASK_JUMP_OFFSET 0x3FFF
 
+#define TYPE_NULL 0
 #define TYPE_A 1
 #define TYPE_NS 2
 #define TYPE_CNAME 5
@@ -70,10 +71,32 @@ namespace dns {
     USHORT _class = 0;
     UINT _ttl = 0;
     USHORT _len = 0;
+    USHORT PrintType() const
+    {
+      if (_type == TYPE_A)
+      {
+        printf(" A ");
+      } else if (_type == TYPE_NS)
+      {
+        printf(" NS ");
+      } else if (_type == TYPE_CNAME)
+      {
+        printf(" CNAME ");
+      } else if (_type == TYPE_PTR)
+      {
+        printf(" PTR ");
+      } else
+      {
+        printf(" UNSUPPORTE TYPE\n");
+      }
+      return _type;
+    }
   };
 #pragma pack(pop)
 
   void LookUp(char* host, char* dnsIp);
   void MakeDNSquestion(char* packet, char* host);
   char* MakeHostReverseIpLookup(char* host);
+  void ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader);
+  void PrintIp(UINT binary);
 }

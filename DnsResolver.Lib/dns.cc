@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <ctime>
 #include <sstream>
+#include <deque>
+
 
 void dns::LookUp(char* host, char* dnsIp)
 {
@@ -119,110 +121,9 @@ void dns::LookUp(char* host, char* dnsIp)
         std::exit(EXIT_FAILURE);
       }
       WSACleanup();
-      auto replyHeader = new FixedDNSheader(buffer);
-      if (replyHeader->ID != ID)
-      {
-        printf("mismatch on TXID\n");
-        std::exit(EXIT_FAILURE);
-      }
+      auto replyHeader = new dns::FixedDNSheader(buffer);
       printf("response in %d ms with %d bytes\n", (timeGetTime() - t), replySize);
-      printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
-        replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
-      USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
-      if (returnCode == 0)
-        printf("  succeeded with Rcode = 0\n");
-      else
-        printf("  failed with Rcode = %hu\n", returnCode);
-      char* question = (char*)(buffer + sizeof(FixedDNSheader));
-      size_t position = 0;
-      if (replyHeader->nQuestions > 0)
-        printf("   ------------ [questions] ----------\n");
-      for (int i = 0; i < replyHeader->nQuestions; ++i)
-      {
-        printf("        ");
-        int labelLength;
-        do
-        {
-          labelLength = question[position];
-          printf("%.*s", labelLength, question + position + 1);
-          position += labelLength + 1;
-          if (question[position] != 0)
-            printf(".");
-        } while (labelLength != 0);
-        QueryHeader* query = new QueryHeader(question + position);
-        printf(" type %hu class %hu\n", query->_type, query->_class);
-
-        position += sizeof(QueryHeader);
-      }
-      UCHAR* cursor = (UCHAR*)(question + position);
-      UCHAR* returnCursor = nullptr;
-      int ttl = TTL_NULL;
-      UINT answers = replyHeader->nAnswers;
-      if (answers == 0)
-        return;
-      printf("   ------------ [answers] ----------\n");
-      for (int i = 0; i < answers * 2; ++i)
-      {
-        // if i is even we are printing the question
-        // if i is odd we are printing the answer
-        if (i % 2 == 0)
-        {
-          printf("        ");
-        }
-        USHORT jumpIdentifier = 0;
-        USHORT offset = 0; // offset from buffer
-        bool jumpMidAnswer = false;
-        do 
-        {
-          jumpIdentifier = ntohs(*(USHORT*)cursor);
-          offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
-          if (jumpIdentifier >= MASK_JUMP_START) 
-          {
-            returnCursor = cursor + 2;
-            cursor = (UCHAR*)(buffer + offset);
-          } else
-          {
-            USHORT labelLength = 0;
-            do 
-            {
-              labelLength = *cursor;
-              if (labelLength == IDENTIFIER_JUMP_START) {
-                jumpMidAnswer = true;
-                break;
-              }
-              printf("%.*s", labelLength, (char*)(cursor + 1));
-              if (*cursor != 0)
-                cursor += labelLength + 1;
-              if (*cursor != 0)
-                printf(".");
-            } while (labelLength != 0);
-            if (jumpMidAnswer)
-            {
-              jumpMidAnswer = false;
-              continue;
-            }
-            if (returnCursor != nullptr) 
-            {
-              cursor = returnCursor;
-              returnCursor = nullptr;
-            }
-          }
-        } while (*cursor != 0);
-        if (i % 2 == 0) 
-        {
-          DNSanswerHeader* answer = new DNSanswerHeader(cursor);
-          if (answer->_type == TYPE_PTR)
-          {
-            printf(" PTR ");
-          }
-          ttl = answer->_ttl;
-          cursor += sizeof(DNSanswerHeader);
-        } else
-        {
-          printf(" TTL = %d \n", ttl);
-          cursor += 1;
-        }
-      }
+      ParseDnsReply(buffer, replyHeader);
 
       return;
     }
@@ -261,4 +162,117 @@ void dns::MakeDNSquestion(char* packet, char* host)
     if (*period == 0)
       break;
   }
+}
+
+void dns::ParseDnsReply(char buffer[513], FixedDNSheader* replyHeader)
+{
+  printf("  TXID 0x%.4X flags 0x%hu questions %hu answers %hu authority %hu additional %hu\n",
+         replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
+  USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
+  if (returnCode == 0)
+    printf("  succeeded with Rcode = 0\n");
+  else
+    printf("  failed with Rcode = %hu\n", returnCode);
+  char* question = (char*)(buffer + sizeof(FixedDNSheader));
+  size_t position = 0;
+  if (replyHeader->nQuestions > 0)
+    printf("   ------------ [questions] ----------\n");
+  for (int i = 0; i < replyHeader->nQuestions; ++i)
+  {
+    printf("        ");
+    int labelLength;
+    do
+    {
+      labelLength = question[position];
+      printf("%.*s", labelLength, question + position + 1);
+      position += labelLength + 1;
+      if (question[position] != 0)
+        printf(".");
+    } while (labelLength != 0);
+    QueryHeader* query = new QueryHeader(question + position);
+    printf(" type %hu class %hu\n", query->_type, query->_class);
+
+    position += sizeof(QueryHeader);
+  }
+  UCHAR* cursor = (UCHAR*)(question + position);
+  UCHAR* returnCursor = nullptr;
+  int ttl = TTL_NULL;
+  USHORT type = TYPE_NULL;
+  UINT answers = replyHeader->nAnswers;
+  std::deque<UCHAR*> returnCursors;
+  if (answers == 0)
+    return;
+  printf("   ------------ [answers] ----------\n");
+  for (int i = 0; i < answers << 1; ++i)
+  {
+    // if i is even we are printing the answer,
+    // otherwise we are printing the question
+    bool printingAnswer = i % 2 == 0;
+    if (printingAnswer)
+    {
+      printf("        ");
+    }
+    do 
+    {
+      USHORT jumpIdentifier = ntohs(*(USHORT*)cursor);
+      USHORT offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
+      if (jumpIdentifier >= MASK_JUMP_START) 
+      {
+        returnCursors.push_back(cursor + 2);
+        cursor = (UCHAR*)(buffer + offset);
+      } else
+      {
+        USHORT labelLength = 0;
+        do 
+        {
+          labelLength = *cursor;
+          // jump mid answer
+          if (labelLength == IDENTIFIER_JUMP_START) {
+            break;
+          }
+          if (type != TYPE_A) {
+            printf("%.*s", labelLength, (char*)(cursor + 1));
+          } else
+          {
+            PrintIp(ntohl(*(UINT*)(cursor)));
+            cursor += sizeof(UINT);
+            break;
+          }
+          if (*cursor != 0)
+            cursor += labelLength + 1;
+          if (*cursor != 0)
+            printf(".");
+        } while (labelLength != 0);
+      }
+    } while (*cursor != 0);
+    if (!returnCursors.empty())
+    {
+      // always return to the point after the original jump
+      cursor = returnCursors.front();
+      returnCursors.clear();
+    }
+    if (printingAnswer) 
+    {
+      DNSanswerHeader* answer = new DNSanswerHeader(cursor);
+      type = answer->PrintType();
+      ttl = answer->_ttl;
+      cursor += sizeof(DNSanswerHeader);
+    } else
+    {
+      printf(" TTL = %d \n", ttl);
+      // don't advance cursor if we have to jump again
+      if (*cursor != IDENTIFIER_JUMP_START)
+      {
+        cursor += 1;
+      }
+    }
+  }
+}
+
+void dns::PrintIp(UINT binary)
+{
+  printf("%u.", (binary >> 0x18) & 0xFF);
+  printf("%u.", (binary >> 0x10) & 0xFF);
+  printf("%u.", (binary >> 0x08) & 0xFF);
+  printf("%u", binary & 0xFF);
 }
