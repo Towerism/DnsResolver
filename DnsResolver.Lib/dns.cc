@@ -337,8 +337,11 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       cursor = returnCursors.front();
       returnCursors.clear();
     }
-    if (printingQuestion) 
+    if (printingQuestion) {
+      if (CursorOverflowed(buffer, replySize, cursor))
+        PrintInvalidMessage("record", "truncated fixed RR header");
       answer = new DNSanswerHeader(cursor);
+    }
     if (answer != nullptr)
     {
       if (answer->TypeIsSupported())
@@ -353,8 +356,6 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     }
     if (printingQuestion) 
     {
-      if (CursorOverflowed(buffer, replySize, cursor))
-        PrintInvalidMessage("record", "truncated fixed RR header");
       type = answer->PrintType();
       ttl = answer->_ttl;
       cursor += sizeof(DNSanswerHeader);
