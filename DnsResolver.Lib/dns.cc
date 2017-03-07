@@ -254,7 +254,7 @@ void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& po
         printf(".");
     } while (labelLength != 0);
     if (question + position + sizeof(QueryHeader) - 1 >= packetBoundary)
-      PrintInvalidMessage("query", "truncated name");
+      PrintInvalidMessage("query", "truncated fixed query header");
     QueryHeader* query = new QueryHeader(question + position);
     printf(" type %hu class %hu\n", query->_type, query->_class);
     position += sizeof(QueryHeader);
