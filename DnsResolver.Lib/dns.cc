@@ -378,7 +378,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       {
         cursor += 1;
       }
-			type = TYPE_NULL;
+      type = TYPE_NULL;
     }
   }
   if (parsedAnswers < answers)
