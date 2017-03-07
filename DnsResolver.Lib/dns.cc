@@ -204,8 +204,6 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
          replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
   if (replySize < sizeof(FixedDNSheader))
     PrintInvalidMessage("reply", "smaller than fixed header");
-  if (replySize > MAX_PACKET_SIZE)
-    PrintInvalidMessage("reply", "larger than maximum packet size %s bytes", MAX_PACKET_SIZE);
   if (replyHeader->ID != txid)
     PrintInvalidMessage("reply", "TXID mismatch, sent 0x%.4X, received 0x%.4X", txid, replyHeader->ID);
   USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
