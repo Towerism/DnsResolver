@@ -1,0 +1,76 @@
+#+OPTIONS: toc:nil num:nil
+#+AUTHOR: Martin Fracker
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+TITLE: Dns Resolver Analysis
+
+In figure [[fig:random0]] we can see that packet indicates a jump into fixed header.
+This is essentially an occurence of the byte 0xc0 followed by a byte equal to or
+less than 0x0b.
+
+In figure [[fig:random3]] the server returned a packet smaller than 12 bytes, the
+size of the fixed header.
+
+In figure [[fig:random5]] the packet indicated a jump that would result in a
+location past the end of the packet.
+
+In figure [[fig:random6]] the packet indicates a jump with byte 0xc0 at some
+position $x$ within the packet, followed by another byte which indicated an
+offset of $x$. This results in an infinite jump loop.
+
+In figure [[fig:random1]] the packet indicated a huge amount of additional records.
+This inevitably results in the program eventually expecting a jump offset past
+the boundary of the packet.
+
+In figure [[fig:random7]] the packet intends to indicate an answer by jumping. This
+is indicated by the last byte of the packet, 0xc0. However, because the jump
+indicator is the last byte of the packet, the packet offset is truncated.
+
+In figure [[fig:4.rr.length]] the packet indicates an answer length that is longer
+than the amount of bytes left in the rest of the packet.
+
+In figure [[fig:4.rr.truncated.label]] the packet indicates that its one question is
+$x$ amount of bytes long which is larger than the amount of bytes in the rest of
+the packet. For this case, since questions are handled differently in code and
+are displayed differently than answers, authorities, and additional answers,
+they were special enough to have their own error category.
+
+In figure [[fig:4.rr.truncated.name]] the packet ends before the next name is
+finished being specified. That is, not only is there no trailing null byte, but
+the name length, indicates a name longer than there are bytes left in the rest
+of the packet.
+
+#+Name: fig:random0
+#+Caption: Jump into fixed header
+[[./img/random0.irl.png]]
+
+#+Name: fig:random3
+#+Caption: Smaller than fixed header
+[[./img/random3.irl.png]]
+
+#+Name: fig:random5
+#+Caption: Jump beyond packet boundary
+[[./img/random5.irl.png]]
+
+#+Name: fig:random6
+#+Caption: Jump loop
+[[./img/random6.irl.png]]
+
+#+Name: fig:random1
+#+Caption: Truncated jump offset
+[[./img/random1.irl.png]]
+
+#+Name: fig:random7
+#+Caption: Truncated jump offset
+[[./img/random7.irl.png]]
+
+#+Name: fig:4.rr.length
+#+Caption: RR value length beyond packet
+[[./img/random4.irl.rr.length.beyond.packet.png]]
+
+#+Name: fig:4.rr.truncated.label
+#+Caption: Truncated label
+[[./img/random4.irl.rr.truncated.label.png]]
+
+#+Name: fig:4.rr.truncated.name
+#+Caption: Truncated name
+[[./img/random4.irl.rr.truncated.name.png]]
