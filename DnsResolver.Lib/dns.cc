@@ -319,7 +319,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
           {
             type = TYPE_LIMBO;
             oss << GetIp(ntohl(*(UINT*)(cursor)));
-            cursor += sizeof(UINT);
+            cursor += sizeof(UINT) - 1;
             break;
           }
           if ((char*)cursor < buffer + replySize && *cursor != 0)
