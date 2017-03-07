@@ -115,7 +115,7 @@ namespace dns {
   void PrintAnyReceptionErrors(sockaddr_in remote, size_t replySize, sockaddr_in senderAddr);
   void ParseDnsReply(char buffer[513], size_t replySize, USHORT txid);
   void PrintInvalidMessage(const char* invalidType, const char* messageFormat, ...);
-  void ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position);
+  void ParseQuestions(dns::FixedDNSheader* replyHeader, char* question, size_t& position, char* packetBoundary);
   void ParseResourceRecords(const char* heading, char* buffer, size_t replySize, UCHAR*& cursor, UINT answers);
   std::string GetIp(UINT binary);
 }

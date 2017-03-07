@@ -204,6 +204,8 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
          replyHeader->ID, replyHeader->flags, replyHeader->nQuestions, replyHeader->nAnswers, replyHeader->nAuthority, replyHeader->nAdditional);
   if (replySize < sizeof(FixedDNSheader))
     PrintInvalidMessage("reply", "smaller than fixed header");
+  if (replySize > MAX_PACKET_SIZE)
+    PrintInvalidMessage("reply", "larger than maximum packet size %s bytes", MAX_PACKET_SIZE);
   if (replyHeader->ID != txid)
     PrintInvalidMessage("reply", "TXID mismatch, sent 0x%.4X, received 0x%.4X", txid, replyHeader->ID);
   USHORT returnCode = replyHeader->flags & MASK_FLAG_RETURNCODE;
@@ -215,7 +217,7 @@ void dns::ParseDnsReply(char buffer[513], size_t replySize, USHORT txid)
   }
   char* question = (char*)(buffer + sizeof(FixedDNSheader));
   size_t position = 0;
-  ParseQuestions(replyHeader, question, position);
+  ParseQuestions(replyHeader, question, position, buffer + replySize);
   UCHAR* cursor = (UCHAR*)(question + position);
   ParseResourceRecords("answers", buffer, replySize, cursor, replyHeader->nAnswers);
   ParseResourceRecords("authority", buffer, replySize, cursor, replyHeader->nAuthority);
@@ -233,7 +235,7 @@ void dns::PrintInvalidMessage(const char* invalidType, const char* messageFormat
   std::exit(EXIT_FAILURE);
 }
 
-void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& position)
+void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& position, char* packetBoundary)
 {
   if (replyHeader->nQuestions > 0)
     printf("   ------------ [questions] ----------\n");
@@ -243,12 +245,18 @@ void dns::ParseQuestions(FixedDNSheader* replyHeader, char* question, size_t& po
     int labelLength;
     do
     {
+      if (question + position >= packetBoundary)
+        PrintInvalidMessage("query", "truncated label length");
       labelLength = question[position];
+      if (question + position + labelLength + 1 >= packetBoundary)
+        PrintInvalidMessage("query", "truncated label");
       printf("%.*s", labelLength, question + position + 1);
       position += labelLength + 1;
       if (question[position] != 0)
         printf(".");
     } while (labelLength != 0);
+    if (question + position + sizeof(QueryHeader) - 1 >= packetBoundary)
+      PrintInvalidMessage("query", "truncated name");
     QueryHeader* query = new QueryHeader(question + position);
     printf(" type %hu class %hu\n", query->_type, query->_class);
     position += sizeof(QueryHeader);
@@ -290,12 +298,13 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
       USHORT offset = jumpIdentifier & MASK_JUMP_OFFSET; // offset from buffer
       if (jumpIdentifier >= MASK_JUMP_START && type != TYPE_A) 
       {
+        returnCursors.push_back(cursor + 2);
+        cursor = (UCHAR*)(buffer + offset);
         if ((char*)cursor >= buffer + replySize)
           PrintInvalidMessage("record", "jump beyond packet boundary");
         if (offset < sizeof(FixedDNSheader))
           PrintInvalidMessage("record", "jump into fixed header");
-        returnCursors.push_back(cursor + 2);
-        cursor = (UCHAR*)(buffer + offset);
+        
       } else
       {
         USHORT labelLength = 0;
@@ -319,7 +328,7 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
           {
             type = TYPE_LIMBO;
             oss << GetIp(ntohl(*(UINT*)(cursor)));
-            cursor += sizeof(UINT) - 1;
+            cursor += sizeof(UINT);
             break;
           }
           if ((char*)cursor < buffer + replySize && *cursor != 0)
@@ -364,14 +373,14 @@ void dns::ParseResourceRecords(const char* heading, char* buffer, size_t replySi
     } else
     {
       ++parsedAnswers;
-      type = TYPE_NULL;
       answer = nullptr;
       printf(" TTL = %d \n", ttl);
       // don't advance cursor if we have to jump again
-      if (*cursor != IDENTIFIER_JUMP_START)
+      if (*cursor != IDENTIFIER_JUMP_START && type != TYPE_LIMBO)
       {
         cursor += 1;
       }
+			type = TYPE_NULL;
     }
   }
   if (parsedAnswers < answers)
