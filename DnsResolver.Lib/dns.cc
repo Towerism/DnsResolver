@@ -55,7 +55,7 @@ USHORT dns::MakePacket(char* host, size_t& size, char*& pkt)
   dnsHeader->nQuestions = htons(1);
   dnsHeader->flags = htons(FLAG_RECURSIVE | FLAG_QUERY | FLAG_STDQUERY);
   queryHeader->_class = htons(CLASS_INET);
-  // if hostIp is not INADDR_NONE then we do type-A (1) lookup, otherwise we do PTR (2) lookup
+  // if host was not an ip address then we do type-A (1) lookup, otherwise we do PTR (2) lookup
   if (hostIp == INADDR_NONE) // A
   {
     printf("Query   : %s, type 1, TXID 0x%.4X\n", host, ID);
